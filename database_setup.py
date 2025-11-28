@@ -371,12 +371,14 @@ def main():
         db.display_schema()
 
         # Ask user if they want sample data
-        response = input("Would you like to insert sample data? (y/n): ").lower()
+        response = 'y'
+        #response = input("Would you like to insert sample data? (y/n): ").lower()
         if response == 'y':
             db.insert_sample_data()
 
             # Ask user if they want to run sample queries
-            query_response = input("\nWould you like to run sample queries? (y/n): ").lower()
+            #query_response = input("\nWould you like to run sample queries? (y/n): ").lower()
+            query_response = 'n'
             if query_response == 'y':
                 db.run_sample_queries()
             else:
@@ -401,7 +403,3 @@ def main():
         print(f"Error: {e}")
     finally:
         db.close()
-
-
-if __name__ == "__main__":
-    main()
