@@ -23,16 +23,24 @@ model_name = os.getenv("MODEL")
 
 # Greet user and save their prompt
 
-def add_prompt_to_state(
-    tool_context: ToolContext, prompt: str
-) -> dict[str, str]:
-    """Saves the user's initial prompt to the state."""
+def add_prompt_to_state(tool_context: ToolContext, prompt: str) -> dict[str, str]:
     tool_context.state["PROMPT"] = prompt
-    logging.info(f"[State updated] Added to PROMPT: {prompt}")
-    return {"status": "success"}
+    import google.generativeai as genai
+    model = genai.GenerativeModel(os.getenv("MODEL"))
+    tone_response = model.generate_content(
+        f"""
+        Classify tone of this message in ONE WORD from:
+        calm, neutral, confused, angry, frustrated, worried, upset.
+        Message: {prompt}
+        """
+    )
+    tone = tone_response.text.strip().lower()
+    tool_context.state["TONE"] = tone
+    return {"status": "success", "tone": tone}
 
 
-# Configuring the MCP Tool to connect to the Zoo MCP server
+
+# Configuring the MCP Tool to connect to the customer MCP server
 
 mcp_server_url = os.getenv("MCP_SERVER_URL")
 if not mcp_server_url:
@@ -100,24 +108,25 @@ customer_data_agent = Agent(
     model=model_name,
     description="The primary data analyst for the customer success team.",
     instruction="""
-    You are a helpful data analyst. Your goal is to use the tools at your disposal to retrieve or update customer information from a database based on the user's PROMPT.
+    You are a helpful data analyst. Your goal is to use the tools at your disposal
+    to retrieve or update customer information from a database based on the user's PROMPT.
 
-    You have access to a toolset for interacting with a customer database. The available functions are:
-    - get_customer(customer_id: int): Retrieve a customer by their ID.
-    - list_customers(status: str, limit: int = 10): List customers filtered by status ('active' or 'disabled').
-    - update_customer(customer_id: int, field_name: str, field_value: Any): Update a specific field for a customer.
-    - create_ticket(customer_id: int, issue: str, priority: str): Create a new support ticket for a customer.
-    - get_customer_history(customer_id: int): Return all support tickets for a specific customer.
+    IMPORTANT — CUSTOMER TONE:
+    You also receive TONE = {{ TONE }}.
+    Use it to decide PRIORITY when creating tickets:
+    - If tone is 'angry', 'frustrated', 'upset', 'worried' => priority = 'high'
+    - If tone is neutral or calm => priority = 'medium'
+    - Otherwise => priority = 'low'
 
-    Analyze the user's PROMPT and use the appropriate tool(s) to fulfill the request.
-    - If the prompt asks for customer data or service history, use the query tools.
-    - If the prompt asks to change or add information, use the update or create tools.
-    - If the prompt is not related to customer data, do not call any tools.
-    - Summarize what you did and pass the data you retrieved or altered to the next agent.
+    Rules:
+    - If creating a support ticket, ALWAYS choose priority based on tone.
+    - If tone indicates distress, provide more thorough explanations.
+    - Summarize what tools you used and what data you retrieved.
 
     PROMPT:
     {{ PROMPT }}
-    """,
+    """
+    ,
     tools=[
         mcp_tools
     ],
@@ -130,17 +139,23 @@ support_agent = Agent(
     model=model_name,
     description="Synthesizes all information into a friendly, readable response.",
     instruction="""
-    You are the friendly customer-facing voice of the company. Your task is to take the
-    RESEARCH_DATA and present it to the user in a complete and helpful answer.
+    You are the friendly customer-facing voice of the company.
+    You receive:
 
-    - First, present the specific information from the database if the customer_data_agent has provided relevant data.
-    - Then, provide specific help to the questions raised by the user with the data.
-    - If some information is missing, just present the information you have.
-    - Be conversational and engaging.
+    - RESEARCH_DATA = {{ research_data }}
+    - TONE = {{ TONE }}
 
-    RESEARCH_DATA:
-    {{ research_data }}
+    Your job:
+    1. Provide the factual results from RESEARCH_DATA.
+    2. Adjust your tone based on TONE:
+    - If TONE is 'angry', 'frustrated', or 'upset': apologize briefly, acknowledge feelings, 
+        reassure the customer we are resolving the issue.
+    - If TONE is 'worried' or 'confused': provide comfort and clear guidance.
+    - Otherwise: respond in your normal friendly tone.
+
+    3. Do NOT over-apologize. Keep it professional and empathetic.
     """
+
 )
 
 # The router agent
