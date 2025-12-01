@@ -9,3 +9,7 @@ The two main components of this project are:
 
 This deployment is largely following these two google labs: [How to deploy a secure MCP server on Cloud Run
 ](https://codelabs.developers.google.com/codelabs/cloud-run/how-to-deploy-a-secure-mcp-server-on-cloud-run#0) and [Build and deploy an ADK agent that uses an MCP server on Cloud Run](https://codelabs.developers.google.com/codelabs/cloud-run/use-mcp-server-on-cloud-run-with-an-adk-agent?hl=en#0)
+
+## Setup
+Follow [`notes.md`](./notes.md). In cloudshell editor, use `uv sync` to install all the right libraries in your chosen virtual environment.
+
